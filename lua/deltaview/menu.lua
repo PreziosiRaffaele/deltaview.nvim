@@ -272,6 +272,68 @@ M.setup_quickfix_deltaview_on_entry = function()
         vim.fn.setqflist({}, 'r', { items = qf_info.items, idx = idx })
     end
 
+    --- Returns the first window that currently holds a deltaview diff buffer, or nil.
+    --- Deltaview diff buffers are identified by their 'deltaview://diff/' name prefix.
+    local find_deltaview_win = function()
+        for _, win in ipairs(vim.api.nvim_list_wins()) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            if vim.api.nvim_buf_get_name(buf):find('deltaview://diff/', 1, true) ~= nil then
+                return win
+            end
+        end
+    end
+
+    -- patch-like fix for the bug with opening quickfix items from the quickfix buffer
+    -- when quickfix items are opened, if the only window(s) open are deltaview buffers, buftype = 'nofile'
+    -- the quickfix list will always try to open a new horizontal split when current window is qflist
+    -- we cannot override this behavior to allow deltaview, so we attack the points of contact 
+    -- by which users can interact with the qflist. <Enter>, <]q>, and <[q>.
+    -- :cnext and :cprev are not covered; those will still bug, if the user's current window is qflist
+    -- it is ok for those to not be covered, as those will still work when called from main window
+    vim.api.nvim_create_autocmd('FileType', {
+        pattern = 'qf',
+        callback = function(ev)
+            vim.keymap.set('n', '<CR>', function()
+                local lnum = vim.fn.line('.')
+                local items = vim.fn.getqflist()
+                local item = items[lnum]
+                if item and item.user_data and item.user_data.deltaview then
+                    local dv_win = find_deltaview_win()
+                    if dv_win ~= nil then
+                        vim.api.nvim_set_current_win(dv_win)
+                    end
+                end
+                vim.cmd('cc ' .. lnum)
+            end, { buffer = ev.buf, silent = true })
+
+            vim.keymap.set('n', ']q', function()
+                local lnum = vim.fn.line('.')
+                local items = vim.fn.getqflist()
+                local item = items[lnum]
+                if #items > lnum and item and item.user_data and item.user_data.deltaview then
+                    local dv_win = find_deltaview_win()
+                    if dv_win ~= nil then
+                        vim.api.nvim_set_current_win(dv_win)
+                    end
+                end
+                vim.cmd('cc ' .. lnum+1)
+            end, { buffer = ev.buf, silent = true })
+
+            vim.keymap.set('n', '[q', function()
+                local lnum = vim.fn.line('.')
+                local items = vim.fn.getqflist()
+                local item = items[lnum]
+                if lnum > 1 and item and item.user_data and item.user_data.deltaview then
+                    local dv_win = find_deltaview_win()
+                    if dv_win ~= nil then
+                        vim.api.nvim_set_current_win(dv_win)
+                    end
+                end
+                vim.cmd('cc ' .. lnum-1)
+            end, { buffer = ev.buf, silent = true })
+        end,
+    })
+
     vim.api.nvim_create_autocmd('BufWinEnter', {
         pattern = '*',
         callback = function(ev)
@@ -281,22 +343,6 @@ M.setup_quickfix_deltaview_on_entry = function()
 
             local entry, _ = get_delta_entry(ev.buf)
             if entry == nil then return end
-
-            -- When quickfix opens a file in a new split because the previously-displayed window
-            -- held a deltaview diff buffer (buftype='nofile'), close the old deltaview window
-            -- so the second navigation doesn't leave us with an extra split.
-            local current_win = vim.api.nvim_get_current_win()
-            for _, win in ipairs(vim.api.nvim_list_wins()) do
-                if win ~= current_win then
-                    local wbuf = vim.api.nvim_win_get_buf(win)
-                    local bufname = vim.api.nvim_buf_get_name(wbuf)
-                    if vim.bo[wbuf].buftype == 'nofile'
-                        and bufname:find('deltaview://diff/', 1, true) ~= nil
-                    then
-                        vim.api.nvim_win_close(win, true)
-                    end
-                end
-            end
 
             -- still in the deltamenu workflow but entry should not trigger a diff view
             if not entry.user_data.show_delta_on_entry then

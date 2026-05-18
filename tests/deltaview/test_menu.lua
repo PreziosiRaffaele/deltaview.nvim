@@ -734,4 +734,22 @@ T['setup_quickfix_deltaview_on_entry()']['callback: does not call view.deltaview
     eq(child.lua_get('_G.fixture.deltaview_file_args'), vim.NIL)
 end
 
+-- When setup_quickfix_deltaview_on_entry() registers a FileType qf autocmd, it must
+-- bind keymap.set on the qf buffer for every navigation key that is overridden to
+-- redirect quickfix jumps into an existing deltaview window.
+T['setup_quickfix_deltaview_on_entry()']['FileType qf autocmd: calls keymap.set for <CR>, ]q, and [q when a qf buffer is opened'] = function()
+    child.lua([[
+        _G.fixture.keymap_set_lhs = {}
+        vim.keymap.set = function(_mode, lhs, _rhs, _opts)
+            _G.fixture.keymap_set_lhs[lhs] = true
+        end
+        local buf = vim.api.nvim_create_buf(false, true)
+        vim.api.nvim_set_current_buf(buf)
+        vim.api.nvim_exec_autocmds('FileType', { pattern = 'qf' })
+    ]])
+    eq(child.lua_get("_G.fixture.keymap_set_lhs['<CR>']"), true)
+    eq(child.lua_get("_G.fixture.keymap_set_lhs[']q']"), true)
+    eq(child.lua_get("_G.fixture.keymap_set_lhs['[q']"), true)
+end
+
 return T
