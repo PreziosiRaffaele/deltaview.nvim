@@ -56,11 +56,11 @@ local open_deltaview_on_buffer = function(dv_data)
             end
             if dv_bufid ~= nil then
                 help.register_keybind(dv_bufid, ':DeltaMenu! [ref]',
-                    'Populate the quickfix list with all diff files, then open it')
+                    'Populate the quickfix list with all diff files, then open it', 'hint')
                 help.register_keybind(dv_bufid, ']q / [q ',
-                    'Use native quickfix keybind to open next diff file or prev diff file if in quickfix list')
+                    'Use native quickfix keybind to open next diff file or prev diff file if in quickfix list', 'keybind')
                 help.register_keybind(dv_bufid, ':colder OR :cex []',
-                    'Restore the previous quickfix list, exiting the DeltaMenu review workflow')
+                    'Restore the previous quickfix list, exiting the DeltaMenu review workflow', 'hint')
 
                 -- flagging breaking changes
                 if config.options.keyconfig.next_diff ~= nil and config.options.keyconfig.next_diff ~= '' then

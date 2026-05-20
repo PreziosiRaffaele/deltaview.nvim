@@ -26,9 +26,9 @@ M.deltaview_file = function(ref)
     end
 
     vim.keymap.set('n', '<Esc>', nav_back_and_place_cursor, { buffer = diff_bufnr, silent = true })
-    help.register_keybind(diff_bufnr, '<Esc>', 'close diff and return to file')
+    help.register_keybind(diff_bufnr, '<Esc>', 'close diff and return to file', 'keybind')
     vim.keymap.set('n', 'q', nav_back_and_place_cursor, { buffer = diff_bufnr, silent = true })
-    help.register_keybind(diff_bufnr, 'q', 'close diff and return to file')
+    help.register_keybind(diff_bufnr, 'q', 'close diff and return to file', 'keybind')
     help.setup_help_keybind(diff_bufnr)
     return diff_bufnr
 end
@@ -58,9 +58,9 @@ M.delta_path = function(ref, context, path)
     end
 
     vim.keymap.set('n', '<Esc>', nav_back_and_place_cursor, { buffer = diff_bufnr, silent = true })
-    help.register_keybind(diff_bufnr, '<Esc>', 'close diff and return to file')
+    help.register_keybind(diff_bufnr, '<Esc>', 'close diff and return to file', 'keybind')
     vim.keymap.set('n', 'q', nav_back_and_place_cursor, { buffer = diff_bufnr, silent = true })
-    help.register_keybind(diff_bufnr, 'q', 'close diff and return to file')
+    help.register_keybind(diff_bufnr, 'q', 'close diff and return to file', 'keybind')
     help.setup_help_keybind(diff_bufnr)
     return diff_bufnr
 end
@@ -467,12 +467,12 @@ M.setup_hunk_navigation = function(bufnr)
     vim.keymap.set('n', config.options.keyconfig.next_hunk, function()
         M.jump_to_hunk(bufnr, true)
     end, { buffer = bufnr, silent = true })
-    help.register_keybind(bufnr, config.options.keyconfig.next_hunk, 'jump to next hunk')
+    help.register_keybind(bufnr, config.options.keyconfig.next_hunk, 'jump to next hunk', 'keybind')
 
     vim.keymap.set('n', config.options.keyconfig.prev_hunk, function()
         M.jump_to_hunk(bufnr, false)
     end, { buffer = bufnr, silent = true })
-    help.register_keybind(bufnr, config.options.keyconfig.prev_hunk, 'jump to previous hunk')
+    help.register_keybind(bufnr, config.options.keyconfig.prev_hunk, 'jump to previous hunk', 'keybind')
 end
 
 --- jumps to a hunk when user is on a delta.lua buffer

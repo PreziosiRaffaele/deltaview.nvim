@@ -34,7 +34,7 @@ M.open_vim_ui_select = function(deltaview_qf_list, open_dv_func)
         end,
     }, function(choice)
         if not choice then return end
-        vim.cmd('e ' .. qf_map[choice].filename)
+        vim.cmd('e ' .. vim.fn.fnameescape(qf_map[choice].filename))
         open_dv_func(qf_map[choice].user_data)
     end)
 end
@@ -97,7 +97,7 @@ M.open_deltaview_fzf_lua_menu = function(deltaview_qf_list, open_dv_func)
         actions = {
             ['default'] = function(selected)
                 if not selected or not selected[1] then return end
-                vim.cmd('e ' .. qf_map[selected[1]].filename)
+                vim.cmd('e ' .. vim.fn.fnameescape(qf_map[selected[1]].filename))
                 open_dv_func(qf_map[selected[1]].user_data)
             end
         }
@@ -196,7 +196,7 @@ M.open_deltaview_telescope_menu = function(deltaview_qf_list, open_dv_func)
                 if selection == nil then return end
 
                 local selected = selection.value
-                vim.cmd('e ' .. qf_map[selected].filename)
+                vim.cmd('e ' .. vim.fn.fnameescape(qf_map[selected].filename))
                 open_dv_func(qf_map[selected].user_data)
             end)
             return true
