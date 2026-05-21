@@ -10,7 +10,7 @@ I will keep the version in "Latest" as not a tag, to be extendable for bug fixes
 
 ### [0.3.0] - 2026-05-20 to ongoing
 
-- initial commit - https://github.com/kokusenz/deltaview.nvim/pull/36
+- initial commit - https://github.com/kokusenz/deltaview.nvim/pull/39
 
 #### Added
 

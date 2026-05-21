@@ -294,12 +294,11 @@ M.setup_quickfix_deltaview_on_entry = function()
         pattern = 'qf',
         callback = function(ev)
             local items = vim.fn.getqflist()
-            if #items < 0 or not items[1].user_data.deltaview then
+            if #items < 1 or not items[1].user_data or not items[1].user_data.deltaview then
                 return
             end
             vim.keymap.set('n', '<CR>', function()
                 local lnum = vim.fn.line('.')
-                local items = vim.fn.getqflist()
                 local item = items[lnum]
                 if item and item.user_data and item.user_data.deltaview then
                     local dv_win = find_deltaview_win()
@@ -312,7 +311,6 @@ M.setup_quickfix_deltaview_on_entry = function()
 
             vim.keymap.set('n', ']q', function()
                 local lnum = vim.fn.line('.')
-                local items = vim.fn.getqflist()
                 local item = items[lnum]
                 if #items > lnum and item and item.user_data and item.user_data.deltaview then
                     local dv_win = find_deltaview_win()
@@ -325,7 +323,6 @@ M.setup_quickfix_deltaview_on_entry = function()
 
             vim.keymap.set('n', '[q', function()
                 local lnum = vim.fn.line('.')
-                local items = vim.fn.getqflist()
                 local item = items[lnum]
                 if lnum > 1 and item and item.user_data and item.user_data.deltaview then
                     local dv_win = find_deltaview_win()

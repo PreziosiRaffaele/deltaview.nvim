@@ -739,6 +739,7 @@ end
 -- redirect quickfix jumps into an existing deltaview window.
 T['setup_quickfix_deltaview_on_entry()']['FileType qf autocmd: calls keymap.set for <CR>, ]q, and [q when a qf buffer is opened'] = function()
     child.lua([[
+         vim.fn.getqflist = function() return {{user_data = {deltaview = true}}} end
         _G.fixture.keymap_set_lhs = {}
         vim.keymap.set = function(_mode, lhs, _rhs, _opts)
             _G.fixture.keymap_set_lhs[lhs] = true
