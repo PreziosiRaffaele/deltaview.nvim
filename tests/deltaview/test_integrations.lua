@@ -893,13 +893,6 @@ T['DeltaMenu! integration']['quickfix <enter>: opens a deltaview buffer'] = func
     eq(buf_name:find('deltaview://diff/', 1, true) ~= nil, true)
 end
 
--- This test asserts the EXPECTED (not yet implemented) behavior:
--- pressing <Enter> on a second quickfix item should NOT open a new window — it should reuse
--- the existing non-quickfix window.
---
--- Currently this test FAILS because the deltaview buffer opened for the first item has
--- buftype='nofile', which causes Neovim to create a new split instead of reusing that window
--- when the second <Enter> is pressed. Once the bug is fixed this test should pass.
 T['DeltaMenu! integration']['quickfix second <enter>: does not open a new window (expected to fail until bug is fixed)'] = function()
     child.cmd('DeltaMenu! HEAD')
     -- Open the first quickfix item. Deltaview buffer opens in window 1. Layout: 2 windows.

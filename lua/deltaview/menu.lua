@@ -293,6 +293,10 @@ M.setup_quickfix_deltaview_on_entry = function()
     vim.api.nvim_create_autocmd('FileType', {
         pattern = 'qf',
         callback = function(ev)
+            local items = vim.fn.getqflist()
+            if #items < 0 or not items[1].user_data.deltaview then
+                return
+            end
             vim.keymap.set('n', '<CR>', function()
                 local lnum = vim.fn.line('.')
                 local items = vim.fn.getqflist()
@@ -316,7 +320,7 @@ M.setup_quickfix_deltaview_on_entry = function()
                         vim.api.nvim_set_current_win(dv_win)
                     end
                 end
-                vim.cmd('cc ' .. lnum+1)
+                vim.cmd('cc ' .. lnum+1) -- unguarded; want normal qf list error message
             end, { buffer = ev.buf, silent = true })
 
             vim.keymap.set('n', '[q', function()
@@ -329,7 +333,7 @@ M.setup_quickfix_deltaview_on_entry = function()
                         vim.api.nvim_set_current_win(dv_win)
                     end
                 end
-                vim.cmd('cc ' .. lnum-1)
+                vim.cmd('cc ' .. lnum-1) -- unguarded; want normal qf list error message
             end, { buffer = ev.buf, silent = true })
         end,
     })
