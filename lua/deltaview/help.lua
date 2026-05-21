@@ -6,10 +6,11 @@ local config = require('deltaview.config')
 --- @param bufnr number
 --- @param key string the key as displayed to the user (e.g. "<Tab>", "q")
 --- @param desc string short description of what the keybind does
-M.register_keybind = function(bufnr, key, desc)
+--- @param type 'keybind' | 'hint' what type of help is this
+M.register_keybind = function(bufnr, key, desc, type)
     -- vim.b values with table types must be fully reassigned
     local entries = vim.b[bufnr].deltaview_help_entries or {}
-    table.insert(entries, { key = key, desc = desc })
+    table.insert(entries, { key = key, desc = desc, type = type })
     vim.b[bufnr].deltaview_help_entries = entries
 end
 
@@ -23,11 +24,25 @@ M.open_help_menu = function(bufnr)
         max_key_len = math.max(max_key_len, #e.key)
     end
 
-    local title = ' Deltaview keybindings '
-    local lines = { title, string.rep('─', #title) }
+    local title = ' Deltaview Help '
+    local lines = { title, '', ' Keybinds ', string.rep('─', #title) }
+    local hints = {}
     for _, e in ipairs(entries) do
-        local padding = string.rep(' ', max_key_len - #e.key)
-        table.insert(lines, string.format(' %s%s  %s ', e.key, padding, e.desc))
+        if e.type == 'keybind' then
+            local padding = string.rep(' ', max_key_len - #e.key)
+            table.insert(lines, string.format(' %s%s  %s ', e.key, padding, e.desc))
+        elseif e.type == 'hint' then
+            local padding = string.rep(' ', max_key_len - #e.key)
+            table.insert(hints, string.format(' %s%s  %s ', e.key, padding, e.desc))
+        end
+    end
+    if #hints > 0 then
+        table.insert(lines, '' )
+        table.insert(lines, ' Hints ' )
+        table.insert(lines, string.rep('─', #title)  )
+        for _, e in ipairs(hints) do
+            table.insert(lines, e)
+        end
     end
     table.insert(lines, '')
 
@@ -68,7 +83,7 @@ end
 --- Call this after all other keybinds for the buffer have been registered.
 --- @param bufnr number
 M.setup_help_keybind = function(bufnr)
-    M.register_keybind(bufnr, config.options.keyconfig.help_legend, 'open this help menu')
+    M.register_keybind(bufnr, config.options.keyconfig.help_legend, 'open this help menu', 'keybind')
     vim.keymap.set('n', config.options.keyconfig.help_legend, function()
         M.open_help_menu(bufnr)
     end, { buffer = bufnr, silent = true })

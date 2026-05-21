@@ -742,13 +742,18 @@ T['get_sorted_diffed_files()'] = new_set({
                 end
 
                 vim.system = function(cmd, _opts)
-                    -- Distinguish the three vim.system call sites by command shape:
-                    -- 1. dirstat: {'git', 'diff', ref, '-X', '--dirstat=lines,0'}
-                    -- 2. numstat: {'git', 'diff', '--numstat', ref, '--', abs_path}
+                    -- Distinguish the four vim.system call sites by command shape:
+                    -- 1. dirstat:     {'git', 'diff', ref, '-X', '--dirstat=lines,0'}
+                    -- 2. name-status: {'git', 'diff', '--name-status', ref}
+                    -- 3. numstat (tracked):   {'git', 'diff', '--numstat', ref, '--', abs_path}
+                    -- 4. numstat (untracked): {'git', 'diff', '--numstat', '--no-index', '--', '/dev/null', abs_path}
                     local stdout
                     if cmd[1] == 'git' and cmd[2] == 'diff' and cmd[4] == '-X' then
                         -- dirstat call
                         stdout = _G.fixture.dirstat_out or ''
+                    elseif cmd[1] == 'git' and cmd[2] == 'diff' and cmd[3] == '--name-status' then
+                        -- name-status call
+                        stdout = _G.fixture.name_status_out or ''
                     elseif cmd[1] == 'git' and cmd[2] == 'diff' and cmd[3] == '--numstat' then
                         -- untracked: {'git','diff','--numstat','--no-index','--','/dev/null', abs_path}  -> cmd[7]
                         -- tracked:   {'git','diff','--numstat', ref,         '--', abs_path}            -> cmd[6]
@@ -787,17 +792,19 @@ T['get_sorted_diffed_files()']['returns empty table and notifies on dirstat git 
     eq(notify_called, true)
 end
 
-T['get_sorted_diffed_files()']['single tracked file returns correct name, added, removed'] = function()
+T['get_sorted_diffed_files()']['single tracked file returns correct name, added, removed, and status'] = function()
     child.lua([[
-        _G.fixture.files_map   = { ['lua/foo.lua'] = true }
-        _G.fixture.dirstat_out = '  100.0% lua/\n'
-        _G.fixture.numstat_map = { ['/repo/lua/foo.lua'] = '10\t3\tlua/foo.lua\n' }
+        _G.fixture.files_map      = { ['lua/foo.lua'] = true }
+        _G.fixture.dirstat_out    = '  100.0% lua/\n'
+        _G.fixture.name_status_out = 'M\tlua/foo.lua\n'
+        _G.fixture.numstat_map    = { ['/repo/lua/foo.lua'] = '10\t3\tlua/foo.lua\n' }
     ]])
     local result = child.lua_get([[M.get_sorted_diffed_files('HEAD')]])
     eq(#result, 1)
     eq(result[1].name,    'lua/foo.lua')
     eq(result[1].added,   10)
     eq(result[1].removed, 3)
+    eq(result[1].status,  'M')
 end
 
 T['get_sorted_diffed_files()']['files sorted by directory dirstat weight descending'] = function()
@@ -922,240 +929,12 @@ T['git_rel_to_abs()']['trims trailing newline from git root before joining'] = f
     eq(result, '/repo/root/src/main.lua')
 end
 
-T['git_rel_to_abs()']['returns nil when git rev-parse fails'] = function()
+T['git_rel_to_abs()']['throws error when git rev-parse fails'] = function()
     child.lua([[
         _G.fixture.system_result = { code = 128, stdout = '', stderr = 'not a git repo' }
     ]])
-    local result = child.lua_get([[M.git_rel_to_abs('any.lua')]])
-    eq(result, vim.NIL)
-end
-
-T['git_rel_to_abs()']['notifies on git failure'] = function()
-    child.lua([[
-        _G.fixture.system_result = { code = 128, stdout = '', stderr = 'fatal' }
-        _G.fixture.notify_called = false
-        vim.notify = function(_msg, _level) _G.fixture.notify_called = true end
-    ]])
-    child.lua_get([[M.git_rel_to_abs('any.lua')]])
-    local notify_called = child.lua_get([[_G.fixture.notify_called]])
-    eq(notify_called, true)
-end
-
--- ──────────────────────────────────────────────────────────────────────────────────────────────
--- label_filepath_item() - property based tests
-
-local LabelFilepathItem = {}
-
---- @class label_filepath_item__case
---- @field name string
---- @field items string[]  filepaths to feed into the extractor in order
-
-LabelFilepathItem.cases = {
-    {
-        -- Simple filenames with no directory prefix.
-        name  = 'flat filenames',
-        items = { 'alpha.lua', 'beta.lua', 'gamma.lua', 'delta.lua' },
-    },
-    {
-        -- Paths with directory components; label must come from the filename only.
-        name  = 'paths with directories',
-        items = { 'src/alpha.lua', 'tests/alpha_test.lua', 'lua/module.lua' },
-    },
-    {
-        -- Files that share the same first character — second file must fall back to next char.
-        name  = 'multiple files sharing same initial character',
-        items = { 'foo.lua', 'far.lua', 'find.lua', 'fetch.lua' },
-    },
-    {
-        -- Single file — must produce the first char of its filename.
-        name  = 'single file',
-        items = { 'only_file.lua' },
-    },
-    {
-        -- Files named with uppercase — labels must be lowercased.
-        name  = 'uppercase filenames are lowercased',
-        items = { 'Alpha.lua', 'Beta.lua' },
-    },
-    {
-        -- Many files with very short names so first chars exhaust quickly,
-        -- forcing use of later characters.
-        name  = 'many files forcing character advancement',
-        items = { 'a.lua', 'b.lua', 'c.lua', 'd.lua', 'e.lua', 'f.lua', 'g.lua', 'h.lua' },
-    },
-}
-
-LabelFilepathItem.properties = {}
-
--- Every label produced is a non-empty string.
-LabelFilepathItem.properties.label_is_nonempty_string = [[(function()
-    local items = _G.fixture.items
-    local extractor = M.label_filepath_item()
-    for _, item in ipairs(items) do
-        local label = extractor(item)
-        if type(label) ~= 'string' or #label == 0 then return false end
-    end
-    return true
-end)()]]
-
--- Every label produced within a single extractor instance is unique.
-LabelFilepathItem.properties.labels_are_unique = [[(function()
-    local items = _G.fixture.items
-    local extractor = M.label_filepath_item()
-    local seen = {}
-    for _, item in ipairs(items) do
-        local label = extractor(item)
-        if seen[label] then return false end
-        seen[label] = true
-    end
-    return true
-end)()]]
-
--- Every label is a lowercase single character (or the numeric fallback string).
--- The numeric fallback only fires when all characters in every filename are exhausted,
--- which won't happen for our reasonable test inputs, so we can assert single-char strictly.
-LabelFilepathItem.properties.label_is_lowercase_char = [[(function()
-    local items = _G.fixture.items
-    local extractor = M.label_filepath_item()
-    for _, item in ipairs(items) do
-        local label = extractor(item)
-        -- label must be one lowercase letter (a-z)
-        if not label:match('^[a-z]$') then return false end
-    end
-    return true
-end)()]]
-
--- The label is chosen from the filename portion of the path, not the directory prefix.
--- For a path like 'src/foo.lua', the first candidate character is 'f', not 's'.
-LabelFilepathItem.properties.label_derived_from_filename = [[(function()
-    -- Use a fresh extractor so no chars are consumed yet.
-    local extractor = M.label_filepath_item()
-    -- 'src/foo.lua' — filename is 'foo.lua', first char is 'f'
-    local label = extractor('src/foo.lua')
-    return label == 'f'
-end)()]]
-
-T['label_filepath_item() properties'] = new_set()
-for func_name, func in pairs(LabelFilepathItem.properties) do
-    for _, case in ipairs(LabelFilepathItem.cases) do
-        local test_name = func_name .. ': ' .. case.name
-        -- label_derived_from_filename uses its own hardcoded item, skip multi-item cases for it
-        if func_name == 'label_derived_from_filename' and case.name ~= 'paths with directories' then
-            goto continue
-        end
-        T['label_filepath_item() properties'][test_name] = function()
-            child.lua([[_G.fixture.items = ...]], { case.items })
-            local result = child.lua_get(func)
-            eq(result, true)
-        end
-        ::continue::
-    end
-end
-
--- ──────────────────────────────────────────────────────────────────────────────────────────────
--- get_adjacent_files() - property based tests
-
-local GetAdjacentFiles = {}
-
---- Returns every valid {files, cur_idx} input for lists of lengths 2..5.
---- Exhaustively covers all positions in each list length so wrap-around is
---- exercised at every boundary.
-GetAdjacentFiles.get_inputs = function()
-    local inputs = {}
-    -- Build lists of different lengths and sweep all valid cur_idx positions
-    local lists = {
-        { 'a.lua', 'b.lua' },
-        { 'a.lua', 'b.lua', 'c.lua' },
-        { 'a.lua', 'b.lua', 'c.lua', 'd.lua' },
-        { 'one.lua', 'two.lua', 'three.lua', 'four.lua', 'five.lua' },
-    }
-    for _, files in ipairs(lists) do
-        for idx = 1, #files do
-            table.insert(inputs, { files = files, cur_idx = idx })
-        end
-    end
-    return inputs
-end
-
---- @class get_adjacent_files__case
---- @field name string
---- @field get_inputs fun(): table[]
-
-GetAdjacentFiles.cases = {
-    {
-        -- All list lengths (2-5) with every possible cur_idx — covers all wrap-around points.
-        name       = 'exhaustive: all positions in lists of length 2-5',
-        get_inputs = GetAdjacentFiles.get_inputs,
-    },
-    {
-        -- Minimum list: exactly 2 files. next and prev must point to each other.
-        name       = 'minimum: two-file list, each position',
-        get_inputs = function()
-            return {
-                { files = { 'x.lua', 'y.lua' }, cur_idx = 1 },
-                { files = { 'x.lua', 'y.lua' }, cur_idx = 2 },
-            }
-        end,
-    },
-}
-
-GetAdjacentFiles.properties = {}
-
--- next and prev are never nil — the function always returns valid names.
-GetAdjacentFiles.properties.next_and_prev_are_strings = [[(function()
-    for _, input in ipairs(_G.fixture.inputs) do
-        local result = M.get_adjacent_files(input)
-        if type(result.next) ~= 'string' then return false end
-        if type(result.prev) ~= 'string' then return false end
-    end
-    return true
-end)()]]
-
--- result.next is the file immediately after cur_idx, wrapping to index 1 at the end.
-GetAdjacentFiles.properties.next_is_correct = [[(function()
-    for _, input in ipairs(_G.fixture.inputs) do
-        local files   = input.files
-        local cur_idx = input.cur_idx
-        local expected_next_idx = (cur_idx % #files) + 1
-        local result = M.get_adjacent_files(input)
-        if result.next ~= files[expected_next_idx] then return false end
-    end
-    return true
-end)()]]
-
--- result.prev is the file immediately before cur_idx, wrapping to the last index at the start.
-GetAdjacentFiles.properties.prev_is_correct = [[(function()
-    for _, input in ipairs(_G.fixture.inputs) do
-        local files   = input.files
-        local cur_idx = input.cur_idx
-        local expected_prev_idx = cur_idx - 1
-        if expected_prev_idx < 1 then expected_prev_idx = #files end
-        local result = M.get_adjacent_files(input)
-        if result.prev ~= files[expected_prev_idx] then return false end
-    end
-    return true
-end)()]]
-
--- For a two-file list, next == prev (they both point to the only other file).
-GetAdjacentFiles.properties.two_file_next_equals_prev = [[(function()
-    for _, input in ipairs(_G.fixture.inputs) do
-        if #input.files == 2 then
-            local result = M.get_adjacent_files(input)
-            if result.next ~= result.prev then return false end
-        end
-    end
-    return true
-end)()]]
-
-T['get_adjacent_files() properties'] = new_set()
-for func_name, func in pairs(GetAdjacentFiles.properties) do
-    for _, case in ipairs(GetAdjacentFiles.cases) do
-        local test_name = func_name .. ': ' .. case.name
-        T['get_adjacent_files() properties'][test_name] = function()
-            child.lua([[_G.fixture.inputs = ...]], { case.get_inputs() })
-            local result = child.lua_get(func)
-            eq(result, true)
-        end
-    end
+    local ok = child.lua_get([[pcall(M.git_rel_to_abs, 'any.lua')]])
+    eq(ok, false)
 end
 
 -- ──────────────────────────────────────────────────────────────────────────────────────────────

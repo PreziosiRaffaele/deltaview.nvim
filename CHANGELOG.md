@@ -8,15 +8,40 @@ I will keep the version in "Latest" as not a tag, to be extendable for bug fixes
 
 ## Latest
 
-### [0.2.3] - 2024-04-28 to ongoing
+### [0.3.0] - 2026-05-20 to ongoing
 
-- initial commit - https://github.com/kokusenz/deltaview.nvim/pull/35
+- initial commit - https://github.com/kokusenz/deltaview.nvim/pull/39
+
+#### Added
+
+- `:DeltaMenu!` allows users to put modified files on the quickfix list
+    - This was inspired by `:h DiffTool`. Also fulfills the desired feature for a picker that stays open as you review
+- vim.ui.select is available as a picker, allowing users to use fuzzy pickers for `:DeltaMenu` without a preview window
+- Statuses (modified, added, etc.) are now displayed in :DeltaMenu
+
+#### Fixes
+
+- deleted files can now be consistently entered into via `:DeltaMenu`, fixing the bug where if a full path was deleted, you could not enter a deleted file
+- fzf-lua preview window and telescope preview window no longer wrap lines (user experience driven decision)
+
+#### Deprecated
+
+- `]f` and `[f` keybinds were fully removed, in favor of the more vim-like workflow with the quickfix list
+- quickselect ui was deprecated (the default picker if user did not have fzf-lua or telescope). the quickselect ui was not in line with the focus of this plugin, so it was removed in favor of the more flexible vim.ui.select. It is still available in code via register_ui_select, but will be fully removed in the near future.
+- quick_select_view in configuration was fully removed
+- `register_ui_select` was deprecated (allowing the user to use the quickselect ui for their vim.ui.select)
+- fzf_threshold in configuration was fully removed (user experience driven decision)
+- show_verbose_nav in configuration was fully removed, in favor of the quickfix list workflow
+
+## History
+
+### [0.2.3] - 2026-04-28 to 2026-05-20
+
+- initial commit - 4b8cfe11d2d55a1131ef6be03c72d6cffaa6b8d0 
 
 #### Added
 
 - Support lazy loading by moving command registration to plugin/ and deferring module requires until command invocation
-
-## History
 
 ### [0.2.2] - 2026-04-19 to 2026-04-22
 

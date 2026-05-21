@@ -103,6 +103,21 @@ M.get_sorted_diffed_files = function(ref)
         end
     end
 
+    local name_status_result = vim.system({'git', 'diff', '--name-status', ref}):wait()
+    local file_statuses = {}
+    if name_status_result.code == 0 or name_status_result.code == 1 then
+        for line in name_status_result.stdout:gmatch('[^\n]+') do
+            local status, filepath, changed_filepath = line:match('^([MADRCTU])%S*%s+(%S+)%s*(%S*)$')
+            if status and filepath then
+                if changed_filepath == '' then
+                    file_statuses[filepath] = status
+                else
+                    file_statuses[changed_filepath] = status
+                end
+            end
+        end
+    end
+
     local files_w_stats = {}
     for file, tracked in pairs(files) do
         local numstat_result
@@ -156,7 +171,8 @@ M.get_sorted_diffed_files = function(ref)
         table.insert(sorted_files, {
             name = file,
             added = tonumber(stats.added) or 0,
-            removed = tonumber(stats.removed) or 0
+            removed = tonumber(stats.removed) or 0,
+            status = file_statuses[file] or '?',
         })
     end
 
@@ -211,66 +227,13 @@ end
 --- git commands like `git diff --name-only` and `git ls-files` output paths
 --- relative to the repository root, not cwd, so this must be used over vim.fn.fnamemodify.
 --- @param rel_path string path relative to the git root
---- @return string | nil absolute path, or nil if git root could not be determined
+--- @return string absolute path
 M.git_rel_to_abs = function(rel_path)
     local result = vim.system({ 'git', 'rev-parse', '--show-toplevel' }):wait()
-    if result.code ~= 0 then
-        vim.notify('Failed to get git root.', vim.log.levels.ERROR)
-        return nil
-    end
+    assert(result.code == 0, 'Failed to get git root. ' .. (result.stderr or ''))
     return vim.trim(result.stdout) .. '/' .. rel_path
 end
 
-
---- factory function that creates a label extractor for file paths
---- extracts unique single-character labels from filenames (not full paths)
---- @return function A function that takes a filepath and returns a single-character label
-M.label_filepath_item = function()
-    local used_labels = {}
-    return function(item)
-        -- extract just the filename (everything after the last forward slash)
-        local filename = item:match("([^/]+)$") or item
-        local i = 1
-        while i <= #filename do
-            local char = string.lower(filename:sub(i, i))
-            if used_labels[char] == nil then
-                used_labels[char] = true
-                return char
-            end
-            i = i + 1
-        end
-        -- fallback if all characters are used
-        return tostring(i)
-    end
-end
-
---- get the adjacent files (next and previous) for navigation with wrap-around
---- @param diffed_files DiffedFiles table with files array and cur_idx
---- @return AdjacentFiles Table with next and prev file info: { next = { name = string, index = number }, prev = { name = string, index = number } }
-M.get_adjacent_files = function(diffed_files)
-    assert(diffed_files)
-    assert(diffed_files.files)
-    assert(diffed_files.cur_idx)
-    -- calculate next index with wrap-around
-    local next_index = diffed_files.cur_idx + 1
-    if next_index > #diffed_files.files then
-        next_index = 1
-    end
-
-    -- calculate previous index with wrap-around
-    local prev_index = diffed_files.cur_idx - 1
-    if prev_index < 1 then
-        prev_index = #diffed_files.files
-    end
-
-    --- @type AdjacentFiles
-    local adjacents = {
-        next = diffed_files.files[next_index],
-        prev = diffed_files.files[prev_index],
-    }
-
-    return adjacents
-end
 
 --- @param sorted_files SortedFile[]
 --- @return table list of file names
@@ -394,11 +357,9 @@ return M
 --- @field added number
 --- @field removed number
 
+--- @alias Status 'M'|'A'|'D'|'R'|'C'|'T'|'U'|'?'
 --- @class SortedFile
 --- @field name string
 --- @field added number
 --- @field removed number
-
---- @class AdjacentFiles
---- @field next string
---- @field prev string
+--- @field status Status
