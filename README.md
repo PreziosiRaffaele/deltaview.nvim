@@ -19,7 +19,7 @@ https://github.com/user-attachments/assets/6a28f113-9462-4568-93ca-6db6e7f8be97
 https://github.com/user-attachments/assets/9695e4ac-b858-41fd-9eb2-c082636dde2c
 
 ### :DeltaMenu demo
-https://github.com/user-attachments/assets/b4f7cac3-3d96-4a4b-9076-98cd8a33c7d6
+https://github.com/user-attachments/assets/4035f361-e890-41c4-8b82-f57f5491b665
 
 ## Features
 
