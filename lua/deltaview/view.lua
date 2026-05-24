@@ -86,7 +86,7 @@ M.open_git_diff_buffer = function(filepath, ref, winnr)
     local git_data
 
     if is_untracked ~= true then
-        local diff_result = vim.system({ 'git', '-C', git_root, 'diff', '-U0', ref, '--', filepath }):wait()
+        local diff_result = vim.system({ 'git', '-C', git_root, 'diff', '--no-ext-diff', '-U0', ref, '--', filepath }):wait()
         if diff_result.code ~= 0 and diff_result.code ~= 1 then
             vim.notify('Failed to run git diff - ' .. diff_result.stderr, vim.log.levels.ERROR)
             return
