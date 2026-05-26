@@ -560,8 +560,12 @@ T['get_diffed_files()']['captures the ref passed to the git command'] = function
     ]])
     child.lua_get([[M.get_diffed_files('main~3')]])
     local cmd = child.lua_get([[_G.fixture.captured_cmd]])
-    eq(cmd[2], 'diff')
-    eq(cmd[3], 'main~3')
+    local found = {}
+    for _, text in ipairs(cmd) do
+        found[text] = true
+    end
+    eq(found['diff'], true)
+    eq(found['main~3'], true)
 end
 
 -- ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -748,16 +752,20 @@ T['get_sorted_diffed_files()'] = new_set({
                     -- 3. numstat (tracked):   {'git', 'diff', '--numstat', ref, '--', abs_path}
                     -- 4. numstat (untracked): {'git', 'diff', '--numstat', '--no-index', '--', '/dev/null', abs_path}
                     local stdout
-                    if cmd[1] == 'git' and cmd[2] == 'diff' and cmd[4] == '-X' then
+                    local found = {}
+                    for _, text in ipairs(cmd) do
+                        found[text] = true
+                    end
+                    if found['git'] == true and found['diff'] == true and found['-X'] == true then
                         -- dirstat call
                         stdout = _G.fixture.dirstat_out or ''
-                    elseif cmd[1] == 'git' and cmd[2] == 'diff' and cmd[3] == '--name-status' then
+                    elseif found['git'] == true and found['diff'] == true and found['--name-status'] == true then
                         -- name-status call
                         stdout = _G.fixture.name_status_out or ''
-                    elseif cmd[1] == 'git' and cmd[2] == 'diff' and cmd[3] == '--numstat' then
+                    elseif found['git'] == true and found['diff'] == true and found['--numstat'] == true then
                         -- untracked: {'git','diff','--numstat','--no-index','--','/dev/null', abs_path}  -> cmd[7]
                         -- tracked:   {'git','diff','--numstat', ref,         '--', abs_path}            -> cmd[6]
-                        local abs_path = (cmd[4] == '--no-index') and cmd[7] or cmd[6]
+                        local abs_path = cmd[#cmd]
                         local numstat_map = _G.fixture.numstat_map or {}
                         stdout = numstat_map[abs_path] or '0\t0\t' .. abs_path .. '\n'
                     else

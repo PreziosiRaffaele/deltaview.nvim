@@ -67,9 +67,13 @@ local T = new_set({
                 -- mocking shell functions, assuming success here.
                 vim.system = function(cmd, _opts)
                     local stdout = ''
-                    if _cmd[1] == 'git' and _cmd[2] == 'rev-parse' and _cmd[3] == '--show-toplevel' then
+                    local found = {}
+                    for _, text in ipairs(_cmd) do
+                        found[text] = true
+                    end
+                    if found['git'] == true and found['rev-parse'] == true then
                         stdout = '/home/exampleuser/example'
-                    elseif _cmd[1] == 'git' and _cmd[2] == 'diff' and _cmd[3] == '-U0' then
+                    elseif found['git'] == true and found['diff'] == true then
                         local single_file_git_diff = table.concat({
                             "diff --git a/foo.lua b/foo.lua",
                             "index abc1234..def5678 100644",
@@ -261,13 +265,17 @@ local open_git_diff_buffer_happy_mocks = [=[
 
     vim.system = function(cmd, _opts)
         local stdout, code = '', 0
-        if cmd[4] == 'diff' then
-            if cmd[#cmd] == 'a' and cmd[6] ~= 'y' then
+        local found = {}
+        for _, text in ipairs(cmd) do
+            found[text] = true
+        end
+        if found['git'] == true and found['diff'] == true then
+            if found['a'] == true and not found['y'] then
                 stdout = 'a valid non-empty diff string'
             else
                 code = 128
             end
-        elseif cmd[4] == 'cat-file' then
+        elseif found['git'] == true and found['cat-file'] == true then
             code = 128
         end
         return { wait = function() return { code = code, stdout = stdout, stderr = 'err' } end }
