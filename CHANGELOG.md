@@ -8,9 +8,18 @@ I will keep the version in "Latest" as not a tag, to be extendable for bug fixes
 
 ## Latest
 
-### [0.3.0] - 2026-05-20 to ongoing
+### [0.3.1] - 2026-05-26 to ongoing
 
-- initial commit - https://github.com/kokusenz/deltaview.nvim/pull/39
+- initial commit - https://github.com/kokusenz/deltaview.nvim/pull/41
+
+#### Fixes
+- `--no-ext-diff` is passed as a flag into all git diff invocations, to avoid crashing with diff.external configuration (such as difftastic).
+
+## History
+
+### [0.3.0] - 2026-05-20 to 2026-05-26
+
+- initial commit - 8940ac8340987ca4efafd386521c2c21b3ca79ae 
 
 #### Added
 
@@ -32,8 +41,6 @@ I will keep the version in "Latest" as not a tag, to be extendable for bug fixes
 - `register_ui_select` was deprecated (allowing the user to use the quickselect ui for their vim.ui.select)
 - fzf_threshold in configuration was fully removed (user experience driven decision)
 - show_verbose_nav in configuration was fully removed, in favor of the quickfix list workflow
-
-## History
 
 ### [0.2.3] - 2026-04-28 to 2026-05-20
 
