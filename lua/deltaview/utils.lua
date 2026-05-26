@@ -41,7 +41,7 @@ end
 --- @return string[] array of file paths that have been modified or are untracked
 M.get_diffed_files = function(ref)
     assert(ref ~= nil)
-    local result = vim.system({'git', 'diff', ref, '--name-only'}):wait()
+    local result = vim.system({'git', 'diff', '--no-ext-diff', ref, '--name-only'}):wait()
     if result.code ~= 0 and result.code ~= 1 then
         vim.notify('Failed to get diff files from git.', vim.log.levels.ERROR)
         return {}
@@ -88,7 +88,7 @@ end
 M.get_sorted_diffed_files = function(ref)
     assert(ref ~= nil)
     local files = M.get_diffed_and_untracked_files(ref)
-    local dirstat_result = vim.system({'git', 'diff', ref, '-X', '--dirstat=lines,0'}):wait()
+    local dirstat_result = vim.system({'git', 'diff', '--no-ext-diff', ref, '-X', '--dirstat=lines,0'}):wait()
     if dirstat_result.code ~= 0 and dirstat_result.code ~= 1 then
         vim.notify('Failed to get diff dirstat from git.', vim.log.levels.ERROR)
         return {}
@@ -103,7 +103,7 @@ M.get_sorted_diffed_files = function(ref)
         end
     end
 
-    local name_status_result = vim.system({'git', 'diff', '--name-status', ref}):wait()
+    local name_status_result = vim.system({'git', 'diff', '--no-ext-diff', '--name-status', ref}):wait()
     local file_statuses = {}
     if name_status_result.code == 0 or name_status_result.code == 1 then
         for line in name_status_result.stdout:gmatch('[^\n]+') do
@@ -124,9 +124,9 @@ M.get_sorted_diffed_files = function(ref)
 
         if tracked == false then
             -- untracked files have no git history; count all lines as added
-            numstat_result = vim.system({'git', 'diff', '--numstat', '--no-index', '--', '/dev/null', M.git_rel_to_abs(file)}):wait()
+            numstat_result = vim.system({'git', 'diff', '--no-ext-diff', '--numstat', '--no-index', '--', '/dev/null', M.git_rel_to_abs(file)}):wait()
         else
-            numstat_result = vim.system({'git', 'diff', '--numstat', ref, '--', M.git_rel_to_abs(file)}):wait()
+            numstat_result = vim.system({'git', 'diff', '--no-ext-diff', '--numstat', ref, '--', M.git_rel_to_abs(file)}):wait()
         end
         assert(numstat_result.code == 0 or numstat_result.code == 1)
         -- git diff --numstat outputs "-\t-\t<path>" for binary files; explicitly
