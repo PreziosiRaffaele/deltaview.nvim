@@ -118,28 +118,55 @@ M.get_sorted_diffed_files = function(ref)
         end
     end
 
+    -- Batch numstat for tracked files: a single `git diff --numstat <ref>` covers
+    -- every tracked file. The previous per-file loop spawned one subprocess per
+    -- file (plus an extra `git rev-parse` inside git_rel_to_abs), which made
+    -- :DeltaMenu O(N) in git invocations and froze the UI on large branches.
+    local numstat_by_path = {}
+    local has_tracked = false
+    for _, tracked in pairs(files) do
+        if tracked then has_tracked = true break end
+    end
+    if has_tracked then
+        local batch_result = vim.system({'git', 'diff', '--no-ext-diff', '--numstat', ref}):wait()
+        if batch_result.code == 0 or batch_result.code == 1 then
+            for line in batch_result.stdout:gmatch('[^\n]+') do
+                if line:sub(1, 2) == '-\t' then
+                    local path = line:match('^%-\t%-\t(.+)$')
+                    if path then
+                        numstat_by_path[path] = { added = '0', removed = '0' }
+                    end
+                else
+                    local added, removed, path = line:match('^(%d+)%s+(%d+)%s+(.+)$')
+                    if path then
+                        numstat_by_path[path] = { added = added, removed = removed }
+                    end
+                end
+            end
+        else
+            vim.notify('Failed to get diff numstat from git.', vim.log.levels.ERROR)
+        end
+    end
+
     local files_w_stats = {}
     for file, tracked in pairs(files) do
-        local numstat_result
-
-        if tracked == false then
-            -- untracked files have no git history; count all lines as added
-            numstat_result = vim.system({'git', 'diff', '--no-ext-diff', '--numstat', '--no-index', '--', '/dev/null', M.git_rel_to_abs(file)}):wait()
-        else
-            numstat_result = vim.system({'git', 'diff', '--no-ext-diff', '--numstat', ref, '--', M.git_rel_to_abs(file)}):wait()
-        end
-        assert(numstat_result.code == 0 or numstat_result.code == 1)
-        -- git diff --numstat outputs "-\t-\t<path>" for binary files; explicitly
-        -- treat that as 0 added / 0 removed rather than relying on tonumber(nil).
-        local added, removed
-        if numstat_result.stdout:match("^%-\t%-\t") then
-            added, removed = "0", "0"
-        else
-            added, removed = string.match(numstat_result.stdout, "(%d+)%s+(%d+)%s+")
-        end
         --- @type DiffNumstat
-        local parsed_numstat = { added = added, removed = removed }
-
+        local parsed_numstat
+        if tracked == false then
+            -- Untracked files have no git history; each --no-index call needs
+            -- /dev/null on one side, so this stays per-file.
+            local numstat_result = vim.system({'git', 'diff', '--no-ext-diff', '--numstat', '--no-index', '--', '/dev/null', M.git_rel_to_abs(file)}):wait()
+            assert(numstat_result.code == 0 or numstat_result.code == 1)
+            local added, removed
+            if numstat_result.stdout:match("^%-\t%-\t") then
+                added, removed = "0", "0"
+            else
+                added, removed = string.match(numstat_result.stdout, "(%d+)%s+(%d+)%s+")
+            end
+            parsed_numstat = { added = added, removed = removed }
+        else
+            parsed_numstat = numstat_by_path[file] or { added = '0', removed = '0' }
+        end
         files_w_stats[file] = parsed_numstat
     end
 
