@@ -15,6 +15,8 @@ local get_modified_files = function(ref)
         vim.notify('Not in a git repository. Cannot open DeltaView menu for git.', vim.log.levels.WARN)
         return
     end
+    -- Cache git_root so per-file open later doesn't re-spawn `git rev-parse`.
+    local git_root = vim.trim(rev_parse_result.stdout)
 
     assert(ref)
     local sorted_files = utils.get_sorted_diffed_files(ref)
@@ -30,7 +32,7 @@ local get_modified_files = function(ref)
     for _, value in ipairs(sorted_files) do
         changes_data[value.name] = { changes = '+' .. value.added .. ',-' .. value.removed, status = value.status }
     end
-    return { mods = mods, changes_data = changes_data, ref = ref }
+    return { mods = mods, changes_data = changes_data, ref = ref, git_root = git_root }
 end
 
 --- @type fun(dv_data: DeltaViewQfListEntryUserData): nil
@@ -52,7 +54,13 @@ local open_deltaview_on_buffer = function(dv_data)
                 dv_bufid = view.delta_path(dv_data.ref, require('deltaview.state').default_context, dv_data.abs_path)
             else
                 if vim.api.nvim_buf_get_name(0) ~= dv_data.abs_path then return end
-                dv_bufid = view.deltaview_file(dv_data.ref)
+                -- Hand off cached tracked/untracked status and git_root so view.deltaview_file
+                -- can skip the `git ls-files -o` working-tree walk and the redundant
+                -- `git rev-parse` — these dominated per-scroll latency.
+                dv_bufid = view.deltaview_file(dv_data.ref, {
+                    is_untracked = dv_data.status == '?',
+                    git_root = dv_data.git_root,
+                })
             end
             if dv_bufid ~= nil then
                 help.register_keybind(dv_bufid, ':DeltaMenu! [ref]',
@@ -120,6 +128,7 @@ local get_deltaview_qf_list_entries = function(deltamenu_items)
                 ref = deltamenu_items.ref,
                 status = status,
                 changes = deltamenu_items.changes_data[path].changes,
+                git_root = deltamenu_items.git_root,   -- cached so per-file open skips a `git rev-parse`
             }
         }
         table.insert(qflist, qflist_entry)
@@ -370,5 +379,6 @@ M.setup_quickfix_deltaview_on_entry()
 --- @field mods string[] list of changed filepaths
 --- @field changes_data ChangesData list of changes data, where the keys are 1 to 1 with mods
 --- @field ref string
+--- @field git_root string cached repo root; propagated to qf user_data so per-file open can skip `git rev-parse`
 
 return M

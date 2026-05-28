@@ -6,18 +6,22 @@ local _echo_timer = nil
 
 --- deltaview file diff buffer orchestrator, using delta.lua. opens a deltaview diff on top of current window
 --- @param ref string git ref to compare against. Can be branch, commit, tag, etc.
+--- @param opts DeltaviewFileOpts | nil optional hints to skip redundant git work (used by the menu workflow)
 --- @return number | nil bufnr buf id of delta.lua buffer
-M.deltaview_file = function(ref)
+M.deltaview_file = function(ref, opts)
     assert(ref ~= nil)
+    opts = opts or {}
     local filepath = vim.fn.expand('%:p')
     local cur_bufnr = vim.api.nvim_get_current_buf()
     local cursor_placement = M.get_cursor_placement_current_buffer()
     local og_winline = vim.fn.winline()
-    local diff_bufnr = M.open_git_diff_buffer(filepath, ref)
+    local diff_bufnr = M.open_git_diff_buffer(filepath, ref, nil, opts)
     if diff_bufnr == nil then
         return
     end
-    vim.b[diff_bufnr].git_root = vim.b[diff_bufnr].git_root or utils.get_git_root(filepath)
+    -- Reuse the hinted git_root (menu workflow) instead of spawning another
+    -- `git rev-parse` — open_git_diff_buffer already used it.
+    vim.b[diff_bufnr].git_root = vim.b[diff_bufnr].git_root or opts.git_root or utils.get_git_root(filepath)
     M.place_cursor_delta_buffer_entry(diff_bufnr, 0, cursor_placement, og_winline, vim.b[diff_bufnr].git_root)
     M.setup_hunk_navigation(diff_bufnr)
     local nav_back_and_place_cursor = M.get_delta_buffer_cursor_exit_strategy(diff_bufnr, 0, cur_bufnr)
@@ -70,10 +74,14 @@ end
 --- @param filepath string The file path to diff
 --- @param ref string git ref to compare against. Can be branch, commit, tag, etc.
 --- @param winnr number | nil Optional window number to open on.
+--- @param opts DeltaviewFileOpts | nil optional hints from the menu workflow:
+---   - is_untracked: known tracked/untracked status (skips a `git ls-files -o` working-tree walk)
+---   - git_root: cached repo root (skips a `git rev-parse --show-toplevel`)
 --- @return number | nil bufnr buf id of delta.lua buffer
-M.open_git_diff_buffer = function(filepath, ref, winnr)
+M.open_git_diff_buffer = function(filepath, ref, winnr, opts)
     assert(filepath ~= nil)
-    local git_root = utils.get_git_root(filepath)
+    opts = opts or {}
+    local git_root = opts.git_root or utils.get_git_root(filepath)
     if vim.fn.filereadable(filepath) == 0 then
         vim.notify('Not on a real file. Cannot open git diff delta.lua buffer.', vim.log.levels.WARN)
         return
@@ -82,7 +90,15 @@ M.open_git_diff_buffer = function(filepath, ref, winnr)
     local ok, delta = pcall(require, 'delta')
     assert(ok, 'Delta.lua module not found. Please verify delta.lua is installed to deltaview.nvim. `:checkhealth deltaview`')
 
-    local is_untracked = utils.is_untracked_file(filepath, git_root)
+    -- When the caller already knows the tracked/untracked status (menu workflow),
+    -- skip the `git ls-files -o --exclude-standard` subprocess that walks the
+    -- entire working tree — this is the dominant cost when scrolling the menu.
+    local is_untracked
+    if opts.is_untracked ~= nil then
+        is_untracked = opts.is_untracked
+    else
+        is_untracked = utils.is_untracked_file(filepath, git_root)
+    end
     local git_data
 
     if is_untracked ~= true then
@@ -616,3 +632,8 @@ return M
 --- @class CursorLookupEntry
 --- @field new_line_num number
 --- @field filepath string | nil
+
+--- Optional hints from the menu workflow to avoid redundant git subprocess calls per file open.
+--- @class DeltaviewFileOpts
+--- @field is_untracked boolean | nil if non-nil, used instead of spawning `git ls-files -o`
+--- @field git_root string | nil if non-nil, used instead of spawning `git rev-parse --show-toplevel`
