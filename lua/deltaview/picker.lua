@@ -120,7 +120,13 @@ M.open_deltaview_fzf_lua_menu = function(deltaview_qf_list, open_dv_func)
 
     -- wipe cached preview buffers on close so they don't leak
     function DeltaviewPreviewer:close(do_not_clear_cache)
+        -- fzf-lua temporarily closes previews when toggling them. Keep the
+        -- active cached buffer detached from the base cleanup in that case.
+        if do_not_clear_cache and is_cached_buf(self.preview_bufnr) then
+            self.preview_bufnr = nil
+        end
         self.super.close(self, do_not_clear_cache)
+        if do_not_clear_cache then return end
         for _, bufnr in pairs(preview_cache) do
             if vim.api.nvim_buf_is_valid(bufnr) then
                 pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
