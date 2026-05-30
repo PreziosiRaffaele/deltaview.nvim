@@ -28,7 +28,11 @@ local get_modified_files = function(ref)
     --- @type ChangesData
     local changes_data = {}
     for _, value in ipairs(sorted_files) do
-        changes_data[value.name] = { changes = '+' .. value.added .. ',-' .. value.removed, status = value.status }
+        changes_data[value.name] = {
+            changes = '+' .. value.added .. ',-' .. value.removed,
+            status = value.status,
+            is_untracked = value.is_untracked,
+        }
     end
     return { mods = mods, changes_data = changes_data, ref = ref }
 end
@@ -119,6 +123,7 @@ local get_deltaview_qf_list_entries = function(deltamenu_items)
                 show_delta_on_entry = true,
                 ref = deltamenu_items.ref,
                 status = status,
+                is_untracked = deltamenu_items.changes_data[path].is_untracked,
                 changes = deltamenu_items.changes_data[path].changes,
             }
         }
@@ -364,7 +369,7 @@ M.setup_quickfix_deltaview_on_entry()
 
 --- key is filepath, values are tables where key is type of change, value is value
 --- for example, change type "changes" has "+23,-16", and change type "status" has "M", or "D", etc.
---- @alias ChangesData table<string, table<string, string>>
+--- @alias ChangesData table<string, { changes: string, status: Status, is_untracked: boolean }>
 
 --- @class DeltaMenuItems
 --- @field mods string[] list of changed filepaths

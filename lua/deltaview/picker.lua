@@ -51,15 +51,12 @@ M.open_deltaview_fzf_lua_menu = function(deltaview_qf_list, open_dv_func)
 
     local mods, qf_map = get_qf_map(deltaview_qf_list)
 
-    -- Cache of generated diff preview buffers, keyed by entry string (the file's
-    -- bufname). Generating a delta diff spawns several blocking git processes and
-    -- re-runs treesitter highlighting, so we build each file's preview once and
-    -- reuse it on subsequent scrolls. Cleared when the picker closes.
+    -- Diff preview buffers keyed by entry string, reused across scrolls and wiped on close.
     --- @type table<string, number>
     local preview_cache = {}
 
     --- @param bufnr number
-    --- @return boolean true if bufnr is a cached preview buffer we must keep alive
+    --- @return boolean
     local is_cached_buf = function(bufnr)
         for _, cached in pairs(preview_cache) do
             if cached == bufnr then return true end
@@ -83,13 +80,17 @@ M.open_deltaview_fzf_lua_menu = function(deltaview_qf_list, open_dv_func)
         if bufnr ~= nil and vim.api.nvim_buf_is_valid(bufnr) then
             vim.api.nvim_win_set_buf(preview_winid, bufnr)
         else
-            local filepath = utils.git_rel_to_abs(entry_str)
-            local ref = qf_map[entry_str].user_data.ref
+            -- reuse precomputed path metadata to avoid a git rev-parse and an
+            -- untracked-file scan on every preview.
+            local user_data = qf_map[entry_str].user_data
+            local filepath = user_data.abs_path
+            local ref = user_data.ref
+            local is_untracked = user_data.is_untracked
             _buf_name_seq = _buf_name_seq + 1
             bufnr = nil
             local success, err = pcall(function()
                 bufnr = view.open_git_diff_buffer_for_path(filepath, ref, state.default_context, preview_winid,
-                    tostring(_buf_name_seq))
+                    tostring(_buf_name_seq), is_untracked)
             end)
             if not success or bufnr == nil then
                 local tmp = self:get_tmp_buffer()
@@ -99,13 +100,14 @@ M.open_deltaview_fzf_lua_menu = function(deltaview_qf_list, open_dv_func)
                 self:set_preview_buf(tmp)
                 return
             end
+            -- delta buffers default to bufhidden=wipe; 'hide' keeps them alive for the cache.
+            vim.bo[bufnr].bufhidden = 'hide'
             preview_cache[entry_str] = bufnr
         end
 
-        -- Inform fzf-lua about the new buffer and clean up the old placeholder.
-        -- Cached buffers stay alive for reuse, so never delete them here.
         self.preview_bufnr = bufnr
         self:set_style_winopts()
+        -- don't delete cached buffers; only placeholders/non-cached ones
         if not is_cached_buf(old_bufnr) then
             self:safe_buf_delete(old_bufnr)
         end
@@ -116,7 +118,7 @@ M.open_deltaview_fzf_lua_menu = function(deltaview_qf_list, open_dv_func)
         self.win:update_preview_title(title)
     end
 
-    -- Wipe cached preview buffers when the picker closes so they don't leak.
+    -- wipe cached preview buffers on close so they don't leak
     function DeltaviewPreviewer:close(do_not_clear_cache)
         self.super.close(self, do_not_clear_cache)
         for _, bufnr in pairs(preview_cache) do
@@ -131,6 +133,10 @@ M.open_deltaview_fzf_lua_menu = function(deltaview_qf_list, open_dv_func)
         prompt = 'DeltaView Menu > ',
         winopts = {
             title = 'comparing to ' .. state.diff_target_ref,
+            -- debounce previews so fast scrolling doesn't render every item passed over
+            preview = {
+                delay = 100,
+            },
         },
         previewer = DeltaviewPreviewer,
         actions = {

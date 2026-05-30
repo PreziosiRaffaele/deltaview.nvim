@@ -299,6 +299,42 @@ T['open_deltaview_fzf_lua_menu()']['winopts title includes diff_target_ref'] = f
     eq(title, 'comparing to HEAD')
 end
 
+T['open_deltaview_fzf_lua_menu()']['preview forwards explicit tracked state when display status is unknown'] = function()
+    child.lua([[
+        local entry = {
+            filename = '/abs/file with spaces.lua',
+            user_data = {
+                deltaview = true,
+                bufname = 'file with spaces.lua',
+                abs_path = '/abs/file with spaces.lua',
+                status = '?',
+                is_untracked = false,
+                changes = '10',
+                ref = 'HEAD',
+            },
+        }
+        package.loaded['deltaview.view'].open_git_diff_buffer_for_path = function(path, _ref, _context, winid, _buf_name, is_untracked)
+            _G.fixture.preview_path = path
+            _G.fixture.preview_is_untracked = is_untracked
+            local bufnr = vim.api.nvim_create_buf(false, true)
+            vim.api.nvim_win_set_buf(winid, bufnr)
+            return bufnr
+        end
+        M.open_deltaview_fzf_lua_menu({ entry }, function() end)
+        local previewer = _G.fixture.fzf_opts.previewer
+        previewer.win = {
+            preview_winid = vim.api.nvim_get_current_win(),
+            validate_preview = function() return true end,
+            update_preview_title = function() end,
+        }
+        previewer.set_style_winopts = function() end
+        previewer.safe_buf_delete = function() end
+        previewer:populate_preview_buf('file with spaces.lua')
+    ]])
+    eq(child.lua_get([[_G.fixture.preview_path]]), '/abs/file with spaces.lua')
+    eq(child.lua_get([[_G.fixture.preview_is_untracked]]), false)
+end
+
 T['open_deltaview_fzf_lua_menu()']['default action with nil selected is a no-op'] = function()
     child.lua([[
         _G.fixture.open_dv_called = false

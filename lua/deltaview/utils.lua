@@ -166,13 +166,14 @@ M.get_sorted_diffed_files = function(ref)
 
     --- @type SortedFile[]
     local sorted_files = {}
-    for file, _ in pairs(files) do
+    for file, tracked in pairs(files) do
         local stats = files_w_stats[file]
         table.insert(sorted_files, {
             name = file,
             added = tonumber(stats.added) or 0,
             removed = tonumber(stats.removed) or 0,
             status = file_statuses[file] or '?',
+            is_untracked = tracked == false,
         })
     end
 
@@ -363,3 +364,4 @@ return M
 --- @field added number
 --- @field removed number
 --- @field status Status
+--- @field is_untracked boolean
