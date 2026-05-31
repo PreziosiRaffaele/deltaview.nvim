@@ -322,6 +322,20 @@ T['create_diff_menu_pane()']['notifies and returns when there are no modified fi
     eq(child.lua_get('_G.fixture.called'), vim.NIL)
 end
 
+T['create_diff_menu_pane()']['forwards git root from initial rev-parse'] = function()
+    child.lua([[
+        _G.fixture.sorted_files = {}
+        _G.fixture.mods = {}
+        package.loaded['deltaview.utils'].get_sorted_diffed_files = function(_ref, git_root)
+            _G.fixture.git_root = git_root
+            return {}
+        end
+        M.create_diff_menu_pane('HEAD')
+    ]])
+
+    eq(child.lua_get('_G.fixture.git_root'), '/repo')
+end
+
 -- choose_deltaview_menu receives an entry with fully-populated user_data for a modified file
 T['create_diff_menu_pane()']['choose_deltaview_menu receives correct entry user_data for a modified file'] = function()
     child.lua([[

@@ -960,6 +960,16 @@ T['git_rel_to_abs()']['throws error when git rev-parse fails'] = function()
     eq(ok, false)
 end
 
+T['git_rel_to_abs()']['uses provided git root without running git rev-parse'] = function()
+    child.lua([[
+        vim.system = function()
+            error('vim.system should not be called when git_root is provided')
+        end
+    ]])
+    local result = child.lua_get([[M.git_rel_to_abs('lua/foo.lua', '/known/repo')]])
+    eq(result, '/known/repo/lua/foo.lua')
+end
+
 -- ──────────────────────────────────────────────────────────────────────────────────────────────
 -- get_filenames_from_sortedfiles() - property based tests
 
